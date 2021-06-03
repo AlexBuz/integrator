@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Multivariable Integrator</title>
+        <style>
+            h1 {
+                text-align: center;
+            }
+            #content {
+                font-family: sans-serif;
+                margin: auto;
+                width: 500px;
+                max-width: 95vw;
+                line-height: 35px;
+            }
+            #content > * {
+                margin-bottom: 25px;
+            }
+            .integral {
+                margin-bottom: 35px;
+            }
+            .field {
+                display: flex;
+                margin: 5px auto;
+            }
+            #content,
+            input {
+                font-size: 20px;
+            }
+            input[type="text"] {
+                flex: auto;
+                width: 0;
+            }
+            #remove-integral {
+                display: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="content">
+            <h1>Multivariable Integrator</h1>
+            <div>
+                <input
+                    id="add-integral"
+                    type="button"
+                    value="Add Outer Integral"
+                />
+                <input
+                    id="remove-integral"
+                    type="button"
+                    value="Remove Outer Integral"
+                />
+            </div>
+            <div id="integrals">
+                <div class="integral">
+                    <div class="field">
+                        <span>Variable name:&nbsp;</span>
+                        <input
+                            class="var-name"
+                            type="text"
+                            autocomplete="off"
+                        />
+                    </div>
+                    <div class="field">
+                        <span>Lower bound:&nbsp;</span>
+                        <input
+                            class="lower-bound"
+                            type="text"
+                            autocomplete="off"
+                        />
+                    </div>
+                    <div class="field">
+                        <span>Upper bound:&nbsp;</span>
+                        <input
+                            class="upper-bound"
+                            type="text"
+                            autocomplete="off"
+                        />
+                    </div>
+                </div>
+            </div>
+            <div id="inner-integrand" class="field">
+                <span>Inner integrand:&nbsp;</span>
+                <input class="integrand" type="text" autocomplete="off" />
+            </div>
+            <div class="field">
+                <span>Total partitions:&nbsp;</span>
+                <input
+                    id="partitions"
+                    type="text"
+                    autocomplete="off"
+                    value="1000"
+                />
+            </div>
+            <div>
+                <input id="eval" type="button" value="Evaluate" />
+                <div id="result">Result: ???</div>
+            </div>
+        </div>
+        <script>
+            const variables = {};
+
+            const e = 2.718281828459045;
+            const pi = 3.141592653589793;
+
+            const sin = Math.sin;
+            const asin = Math.asin;
+
+            const cos = Math.cos;
+            const acos = Math.acos;
+
+            const tan = Math.tan;
+            const atan = Math.atan;
+
+            const sqrt = Math.sqrt;
+
+            const eval = (...input) => (0, window.eval)(...input);
+
+            function evalIntegralOrExpr(expr) {
+                if (expr instanceof Integral) {
+                    return expr.eval();
+                } else {
+                    return eval(expr);
+                }
+            }
+
+            function validateVarName(name) {
+                if (!/^[A-Za-z_]\w*$/.test(name)) {
+                    throw new Error(`Invalid variable name: \`${name}\``);
+                }
+            }
+
+            function parseExpr(expr) {
+                return expr.replaceAll("^", "**");
+            }
+
+            class Integral {
+                constructor(
+                    varName,
+                    lowerBound,
+                    upperBound,
+                    integrand,
+                    partitions
+                ) {
+                    validateVarName(varName);
+                    this.varName = varName;
+                    this.lowerBound = parseExpr(lowerBound);
+                    this.upperBound = parseExpr(upperBound);
+                    this.integrand =
+                        integrand instanceof Integral
+                            ? integrand
+                            : parseExpr(integrand);
+                    this.partitions = partitions;
+                }
+
+                eval() {
+                    const lowerBound = evalIntegralOrExpr(this.lowerBound);
+                    const upperBound = evalIntegralOrExpr(this.upperBound);
+                    const delta = (upperBound - lowerBound) / this.partitions;
+                    let sum = 0;
+                    eval(`${this.varName}=${lowerBound + delta / 2}`);
+                    for (let i = 0; i < this.partitions; ++i) {
+                        sum += evalIntegralOrExpr(this.integrand);
+                        eval(`${this.varName}+=${delta}`);
+                    }
+                    return sum * delta;
+                }
+            }
+
+            const integralContainer = document.querySelector("#integrals");
+
+            function addIntegralToPage() {
+                document.querySelector("#remove-integral").style.display =
+                    "unset";
+                const integralElem = document.createElement("div");
+                integralElem.className = "integral";
+                const fields = [
+                    { name: "Variable name:&nbsp;", class: "var-name" },
+                    { name: "Lower bound:&nbsp;", class: "lower-bound" },
+                    { name: "Upper bound:&nbsp;", class: "upper-bound" },
+                ];
+                for (const field of fields) {
+                    const div = document.createElement("div");
+                    div.className = "field";
+
+                    const span = document.createElement("span");
+                    span.innerHTML = field.name;
+                    div.append(span);
+
+                    const input = document.createElement("input");
+                    input.type = "text";
+                    input.autocomplete = "off";
+                    input.className = field.class;
+                    div.append(input);
+
+                    integralElem.append(div);
+                }
+                integralContainer.prepend(integralElem);
+            }
+
+            function removeIntegralFromPage() {
+                integralContainer.firstElementChild?.remove();
+                if (integralContainer.childElementCount === 1) {
+                    document.querySelector("#remove-integral").style.display =
+                        "none";
+                }
+            }
+
+            const result = document.querySelector("#result");
+            function evalIntegralsOnPage() {
+                let integral;
+                try {
+                    const partitions =
+                        ((+document.querySelector("#partitions").value) **
+                            (1 / integralContainer.childElementCount)) |
+                        0;
+                    Array.from(document.querySelectorAll(".integral"))
+                        .reverse()
+                        .forEach((elem) => {
+                            if (integral) {
+                                integral = new Integral(
+                                    elem.querySelector(".var-name").value,
+                                    elem.querySelector(".lower-bound").value,
+                                    elem.querySelector(".upper-bound").value,
+                                    integral,
+                                    partitions
+                                );
+                            } else {
+                                integral = new Integral(
+                                    elem.querySelector(".var-name").value,
+                                    elem.querySelector(".lower-bound").value,
+                                    elem.querySelector(".upper-bound").value,
+                                    document.querySelector(".integrand").value,
+                                    partitions
+                                );
+                            }
+                        });
+                    evalButton.disabled = true;
+                    result.textContent = `Evaluating...`;
+                    setTimeout(() => {
+                        result.textContent = `Result: ${integral
+                            .eval()
+                            .toPrecision(8)}`;
+                        evalButton.disabled = false;
+                    }, 50);
+                } catch (err) {
+                    result.textContent = err;
+                }
+            }
+
+            document
+                .querySelector("#add-integral")
+                .addEventListener("click", addIntegralToPage);
+
+            document
+                .querySelector("#remove-integral")
+                .addEventListener("click", removeIntegralFromPage);
+
+            const evalButton = document.querySelector("#eval");
+            evalButton.addEventListener("click", evalIntegralsOnPage);
+        </script>
+    </body>
+</html>
