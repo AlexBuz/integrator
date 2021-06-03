@@ -241,9 +241,13 @@
                     evalButton.disabled = true;
                     result.textContent = `Evaluating...`;
                     setTimeout(() => {
-                        result.textContent = `Result: ${integral
-                            .eval()
-                            .toPrecision(8)}`;
+                        try {
+                            result.textContent = `Result: ${integral
+                                .eval()
+                                .toPrecision(8)}`;
+                        } catch (err) {
+                            result.textContent = err;
+                        }
                         evalButton.disabled = false;
                     }, 50);
                 } catch (err) {
